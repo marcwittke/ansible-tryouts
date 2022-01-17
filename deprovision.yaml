@@ -1,0 +1,21 @@
+- name: Remove Hetzner Server(s)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    hcloud_token: R7qo1fixdsI9TRwgqkHY4PZZWbnQzbP4BE1iX71wn6IcAZxZWFPfxMKvfBMCxrax
+    server_names: 
+      - pwa01
+      - pwa02
+
+  tasks:
+
+    - name: "Hetzner | Ensure absence of server"
+      hetzner.hcloud.hcloud_server:
+        name: "{{ item }}"
+        location: nbg1
+        state: absent
+        api_token: "{{ hcloud_token }}"
+      with_items: 
+        - "{{ server_names }}"

@@ -1,0 +1,116 @@
+- name: Create Hetzner Server(s)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICVCpjrP0V+Ft0twSV9yZiZE9rw8v0OjMBRY5mtmVg4K"
+    public_key_name: "ansible"
+    server_names: 
+      - pwa01
+      - pwa02
+    server_type: cx11
+    hcloud_token: R7qo1fixdsI9TRwgqkHY4PZZWbnQzbP4BE1iX71wn6IcAZxZWFPfxMKvfBMCxrax
+
+  tasks:
+
+    - name: Hetzner | Ensure SSH-Key
+      hetzner.hcloud.hcloud_ssh_key:
+        name: "{{ public_key_name }}"
+        public_key: "{{ public_key }}"
+        api_token: "{{ hcloud_token }}"
+
+    - name: "Hetzner | Ensure Server"
+      hetzner.hcloud.hcloud_server:
+        name: "{{ item }}"
+        server_type: "{{ server_type }}"
+        image: debian-11
+        location: nbg1
+        backups: no
+        ssh_keys:
+          - "{{ public_key_name }}"
+        state: present
+        api_token: "{{ hcloud_token }}"
+      with_items: 
+        - "{{ server_names }}"
+      register: serveroutput
+
+    - debug:
+        var: serveroutput
+
+    - name: Add IP address
+      add_host:
+        hostname: "{{ item.hcloud_server.ipv4_address }}"
+      with_items:
+        - "{{ serveroutput.results }}"
+
+
+- name: Configure Hetzner Server(s)
+  hosts: all
+  user: root
+  gather_facts: no
+
+  tasks:
+
+    - name: Wait for target connection 
+      wait_for_connection:
+        timeout: 300
+
+    
+    - name: apt | Update and upgrade apt packages
+      ansible.builtin.apt:
+        upgrade: yes
+        update_cache: "true"
+        autoremove: "true"
+        cache_valid_time: 86400 
+
+
+    - name: apt | Ensure base packages
+      ansible.builtin.apt:
+        pkg:
+          - acl
+          - apt-transport-https
+          - ca-certificates
+          - curl 
+          - git
+          - p7zip-full
+          - sudo
+          - fail2ban
+
+
+    - name: apt | Reboot if required
+      shell: ( /bin/sleep 5 ; shutdown -r now "Ansible updates triggered" ) &
+            removes=/var/run/reboot-required
+      async: 30
+      poll: 0
+      ignore_errors: true
+      notify:
+        - wait_rebooted
+
+
+
+
+
+    - name: Hardening | Disable SSH password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication.*yes'
+        line: 'PasswordAuthentication=no'
+
+
+    - name: Hardening | Ensure fail2ban configuration
+      template:
+        src: templates/jail.local
+        dest: /etc/fail2ban/jail.local
+
+
+    - name: Hardening | Ensure fail2ban daemon
+      service:
+        name: fail2ban
+        state: restarted
+        enabled: yes    
+
+
+  handlers:
+  - name: wait_rebooted
+    local_action: wait_for host={{ inventory_hostname }} port=22 state=started delay=10 timeout=120
