@@ -1,0 +1,36 @@
+- name: Create Hetzner Server(s)
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICVCpjrP0V+Ft0twSV9yZiZE9rw8v0OjMBRY5mtmVg4K"
+    public_key_name: "ansible"
+    server_names: 
+      - pwa01
+      - pwa02
+    server_type: cx11
+    hcloud_token: 
+
+  tasks:
+
+    - name: Hetzner | Ensure SSH-Key
+      hetzner.hcloud.hcloud_ssh_key:
+        name: "{{ public_key_name }}"
+        public_key: "{{ public_key }}"
+        api_token: "{{ hcloud_token }}"
+
+    - name: "Hetzner | Ensure Server"
+      hetzner.hcloud.hcloud_server:
+        name: "{{ item }}"
+        server_type: "{{ server_type }}"
+        image: debian-11
+        location: nbg1
+        backups: no
+        ssh_keys:
+          - "{{ public_key_name }}"
+        state: present
+        api_token: "{{ hcloud_token }}"
+      with_items: 
+        - "{{ server_names }}"
+

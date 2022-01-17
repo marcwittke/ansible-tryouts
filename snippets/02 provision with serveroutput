@@ -1,0 +1,10 @@
+      register: serveroutput
+
+    - debug:
+        var: serveroutput
+
+    - name: Add IP address
+      add_host:
+        hostname: "{{ item.hcloud_server.ipv4_address }}"
+      with_items:
+        - "{{ serveroutput.results }}"

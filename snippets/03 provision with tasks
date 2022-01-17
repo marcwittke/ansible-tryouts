@@ -1,0 +1,30 @@
+- name: Configure Hetzner Server(s)
+  hosts: all
+  user: root
+  gather_facts: no
+
+  tasks:
+
+    - name: Wait for target connection 
+      wait_for_connection:
+        timeout: 300
+
+    
+    - name: apt | Update and upgrade apt packages
+      ansible.builtin.apt:
+        upgrade: yes
+        update_cache: "true"
+        autoremove: "true"
+        cache_valid_time: 86400 
+
+
+    - name: apt | Ensure base packages
+      ansible.builtin.apt:
+        pkg:
+          - acl
+          - apt-transport-https
+          - ca-certificates
+          - curl 
+          - git
+          - p7zip-full
+          - sudo
